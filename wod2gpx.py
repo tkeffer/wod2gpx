@@ -26,15 +26,18 @@ def parse_file(infile):
     record = {}
 
     # Read file line by line
-    for line in infile:
-        # Skip the section separator
-        if line.startswith("#-----------------------------------------"):
+    for raw_line in infile:
+        line = raw_line.strip()
+        # Skip comments
+        if line.startswith("#"):
+            continue
+        # Look for record separator:
+        elif line.startswith("CAST"):
             if record:  # Save the current record if it's not empty
                 data.append(record)
                 record = {}  # Reset for the next record
-            continue
 
-        fields = line.strip().split(",")
+        fields = line.split(",")
         if fields:
             key = fields[0].strip()
             value = fields[2].strip()
