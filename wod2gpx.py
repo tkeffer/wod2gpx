@@ -1,5 +1,11 @@
+#!env python3
+#
+# Copyright (c) 2025-present Tom Keffer <tkeffer@gmail.com>
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
 import argparse
-import re
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -22,17 +28,16 @@ def parse_file(infile):
     # Read file line by line
     for line in infile:
         # Skip the section separator
-        if line.startswith("#--------------------------------------------------------------------------------"):
+        if line.startswith("#-----------------------------------------"):
             if record:  # Save the current record if it's not empty
                 data.append(record)
                 record = {}  # Reset for the next record
             continue
 
-        # Use regex to match data lines (e.g., Latitude,,value,,units,,)
-        match = re.match(r"(.*?),(.*?),(.*?),(.*)", line.strip())
-        if match:
-            key = match.group(1).strip()
-            value = match.group(3).strip()
+        fields = line.strip().split(",")
+        if fields:
+            key = fields[0].strip()
+            value = fields[2].strip()
             if key and value:  # Avoid storing empty keys or values
                 record[key] = value
 
@@ -43,7 +48,7 @@ def parse_file(infile):
     return data
 
 
-def create_gpx(records, output_file, symbol="Symbol-X-Small-Red"):
+def create_gpx(records, output_file, comment='', symbol="Symbol-X-Small-Red"):
     """
     Create a GPX file from a list of parsed records.
 
@@ -67,12 +72,13 @@ def create_gpx(records, output_file, symbol="Symbol-X-Small-Red"):
             ET.SubElement(wpt, "name").text = name
 
             # Set the 'desc' field as a string with other metadata
-            cast = record.get("CAST", "N/A")
-            nodc_cruise_id = record.get("NODC Cruise ID", "N/A")
-            originators_cruise_id = record.get("Originators Cruise ID", "N/A")
-            ET.SubElement(wpt, "desc").text = (f"CAST: {cast}\n"
-                                               f"NODC Cruise ID: {nodc_cruise_id}\n"
-                                               f"Originators Cruise ID: {originators_cruise_id}")
+            cast = f"CAST: {record.get('CAST', 'N/A')}"
+            nodc_cruise_id = f"NODC Cruise ID: {record.get('NODC Cruise ID', 'N/A')}"
+            originators_cruise_id = f"Originators Cruise ID: {record.get('Originators Cruise ID', 'N/A')}"
+            description = [cast, nodc_cruise_id, originators_cruise_id]
+            if comment:
+                description.insert(0, comment)
+            ET.SubElement(wpt, "desc").text = '\n'.join(description)
 
             year = record.get("Year")
             month = record.get("Month")
@@ -141,6 +147,8 @@ if __name__ == "__main__":
                         type=argparse.FileType('w'),
                         default=sys.stdout,
                         help="File to write GPX data to. Use '-' for stdout.")
+    parser.add_argument('--comment',
+                        help="Comment to be added to the GPX 'desc' field.")
     parser.add_argument('--symbol',
                         default="Symbol-X-Small-Red",
                         help="Symbol to use. Default is a small red x.")
@@ -150,4 +158,4 @@ if __name__ == "__main__":
     parsed_records = parse_file(args.infile)
 
     # Create GPX file
-    create_gpx(parsed_records, args.outfile, symbol=args.symbol)
+    create_gpx(parsed_records, args.outfile, comment=args.comment, symbol=args.symbol)
